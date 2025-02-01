@@ -3,10 +3,10 @@ import socket
 class DNSMessage:
     def __init__(self, 
                  header=bytearray(12), 
-                 question=bytearray(12), 
-                 answer=bytearray(12),
-                 authority=bytearray(12),
-                 space=bytearray(12) 
+                 question=bytearray(), 
+                 answer=None,
+                 authority=None,
+                 space=None
                  ):
         self.header = header
         self.question = question
@@ -63,11 +63,37 @@ class DNSMessage:
         #set ARCOUNT
         high_byte = (ARCOUNT >> 8) & 0xFF
         low_byte = ARCOUNT & 0xFF
-        self.header[8] = high_byte
-        self.header[9] = low_byte
+        self.header[10] = high_byte
+        self.header[11] = low_byte
     
     def get_header(self):
         return self.header
+    
+    def set_question(self,
+                     QNAME="",
+                     QTYPE=0,
+                     QCLASS=0):
+        # Set question name
+        QNAME = QNAME.split('.')
+        for token in QNAME:
+            self.question.append(len(token))
+            self.question.extend(token.encode('utf-8'))
+        self.question.append(0)
+
+        # Set QTYPE
+        high_byte = (QTYPE >> 8) & 0xFF
+        low_byte = QTYPE & 0xFF
+        self.question.append(high_byte)
+        self.question.append(low_byte)
+
+        # Set QCLASS
+        high_byte = (QCLASS >> 8) & 0xFF
+        low_byte = QCLASS & 0xFF
+        self.question.append(high_byte)
+        self.question.append(low_byte)
+    
+    def get_question(self):
+        return self.question
 
 def main():
     # You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -80,10 +106,12 @@ def main():
         try:
             buf, source = udp_socket.recvfrom(512)
             dnsmsg = DNSMessage()
-            dnsmsg.set_header(1234,1)
+            dnsmsg.set_header(ID=1234, QR=1, QDCOUNT=1)
+            dnsmsg.set_question("codecrafters.io", 1, 1)
             header = dnsmsg.get_header()
+            question = dnsmsg.get_question()
     
-            response = header
+            response = header + question
     
             udp_socket.sendto(response, source)
         except Exception as e:
