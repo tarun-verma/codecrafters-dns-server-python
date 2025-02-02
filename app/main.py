@@ -2,15 +2,15 @@ import socket
 
 class DNSMessage:
     def __init__(self, 
-                 header=bytearray(12), 
-                 question=bytearray(), 
+                 header=None, 
+                 question=None, 
                  answer=None,
                  authority=None,
                  space=None
                  ):
-        self.header = header
-        self.question = question
-        self.answer = answer
+        self.header = header if header is not None else bytearray(12)
+        self.question = question if question is not None else bytearray()
+        self.answer = answer if answer is not None else bytearray()
         self.authority = authority
         self.space = space
     
@@ -95,6 +95,55 @@ class DNSMessage:
     def get_question(self):
         return self.question
 
+    def set_answer(self,
+                   NAME="",
+                   TYPE=0, # 2 byte
+                   CLASS=0, # 2 byte
+                   TTL=0, # 4 byte
+                   LENGTH=0, # 2 byte
+                   RDATA=""): # variable
+        
+        NAME = NAME.split('.')
+        for token in NAME:
+            self.answer.append(len(token))
+            self.answer.extend(token.encode('utf-8'))
+        self.answer.append(0) # null byte
+
+        # TYPE
+        high_byte = (TYPE >> 8) & 0xFF
+        low_byte = TYPE & 0xFF
+        self.answer.append(high_byte)
+        self.answer.append(low_byte)
+
+        # CLASS
+        high_byte = (CLASS >> 8) & 0xFF
+        low_byte = CLASS & 0xFF
+        self.answer.append(high_byte)
+        self.answer.append(low_byte)
+
+        # TTL
+        highest_byte = (TTL >> 24) & 0xFF
+        higher_byte = (TTL >> 16) & 0xFF
+        high_byte = (TTL >> 8) & 0xFF
+        low_byte = TTL & 0xFF
+        self.answer.append(highest_byte)
+        self.answer.append(higher_byte)
+        self.answer.append(high_byte)
+        self.answer.append(low_byte)
+
+        # LENGTH
+        high_byte = (LENGTH >> 8) & 0xFF
+        low_byte = LENGTH & 0xFF
+        self.answer.append(high_byte)
+        self.answer.append(low_byte)
+
+        # RDATA
+        self.answer.extend(RDATA.encode('utf-8'))
+    
+    def get_answer(self):
+        return self.answer
+
+
 def main():
     # You can use print statements as follows for debugging, they'll be visible when running tests.
     print("Logs from your program will appear here!")
@@ -106,12 +155,15 @@ def main():
         try:
             buf, source = udp_socket.recvfrom(512)
             dnsmsg = DNSMessage()
-            dnsmsg.set_header(ID=1234, QR=1, QDCOUNT=1)
-            dnsmsg.set_question("codecrafters.io", 1, 1)
+            dnsmsg.set_header(ID=1234, QR=1, QDCOUNT=1, ANCOUNT=1)
+            dnsmsg.set_question(QNAME="codecrafters.io", QTYPE=1, QCLASS=1)
+            dnsmsg.set_answer(NAME="codecrafters.io", TYPE=1, CLASS=1, TTL=60, LENGTH=4, RDATA="8.8.8.8")
+
             header = dnsmsg.get_header()
             question = dnsmsg.get_question()
+            answer = dnsmsg.get_answer()
     
-            response = header + question
+            response = header + question + answer
     
             udp_socket.sendto(response, source)
         except Exception as e:
