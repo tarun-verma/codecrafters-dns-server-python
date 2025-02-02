@@ -154,8 +154,27 @@ def main():
     while True:
         try:
             buf, source = udp_socket.recvfrom(512)
+
+            recvd_header = buf[:12]
+
+            ID = int.from_bytes(recvd_header[0:2])
+            FLAGS = int.from_bytes(recvd_header[2:4])
+
+            # Parse individual values inside the FLAGS
+            OPCODE = (FLAGS >> 11) & 0b1111
+            RD = (FLAGS >> 8) & 1
+            RCODE = 0 if OPCODE == 0 else 4
+
             dnsmsg = DNSMessage()
-            dnsmsg.set_header(ID=1234, QR=1, QDCOUNT=1, ANCOUNT=1)
+
+            dnsmsg.set_header(ID=ID, 
+                              QR=1,
+                              OPCODE=OPCODE,
+                              RD=RD,
+                              RCODE=RCODE,
+                              QDCOUNT=1, 
+                              ANCOUNT=1)
+            
             dnsmsg.set_question(QNAME="codecrafters.io", QTYPE=1, QCLASS=1)
             dnsmsg.set_answer(NAME="codecrafters.io", TYPE=1, CLASS=1, TTL=60, LENGTH=4, RDATA="8.8.8.8")
 
