@@ -144,8 +144,26 @@ class DNSMessage:
         return self.answer
 
 
+def parse_domain_name(domain_bytes):
+    domain_name = []
+    i = 0
+
+    while i < len(domain_bytes):
+        length = domain_bytes[i]
+
+        if length == 0:
+            break
+
+        i += 1
+        domain_name.append(domain_bytes[i:length+i].decode('utf-8'))
+
+        i += length
+    
+    return ".".join(domain_name)
+
+
 def main():
-    # You can use print statements as follows for debugging, they'll be visible when running tests.
+    # You can use `print` statements as follows for debugging, they'll be visible when running tests.
     print("Logs from your program will appear here!")
     
     udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -156,6 +174,10 @@ def main():
             buf, source = udp_socket.recvfrom(512)
 
             recvd_header = buf[:12]
+            remainder = buf[12:]
+
+            
+            domain_name = parse_domain_name(remainder)
 
             ID = int.from_bytes(recvd_header[0:2])
             FLAGS = int.from_bytes(recvd_header[2:4])
@@ -175,8 +197,8 @@ def main():
                               QDCOUNT=1, 
                               ANCOUNT=1)
             
-            dnsmsg.set_question(QNAME="codecrafters.io", QTYPE=1, QCLASS=1)
-            dnsmsg.set_answer(NAME="codecrafters.io", TYPE=1, CLASS=1, TTL=60, LENGTH=4, RDATA="8.8.8.8")
+            dnsmsg.set_question(QNAME=domain_name, QTYPE=1, QCLASS=1)
+            dnsmsg.set_answer(NAME=domain_name, TYPE=1, CLASS=1, TTL=60, LENGTH=4, RDATA="8.8.8.8")
 
             header = dnsmsg.get_header()
             question = dnsmsg.get_question()
