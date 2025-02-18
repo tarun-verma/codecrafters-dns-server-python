@@ -1,6 +1,6 @@
 import socket
 
-class DNSPacket:
+class DNSMessage:
     def __init__(self, 
                  header=None, 
                  question=None, 
@@ -184,16 +184,16 @@ def main():
     print("Logs from your program will appear here!")
     
     udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    forwarder_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     udp_socket.bind(("127.0.0.1", 2053))
+    forwarder_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     
     while True:
         try:
             buf, source = udp_socket.recvfrom(512)
-            
+            # Parse individual values inside the FLAGS
             ID = int.from_bytes(buf[0:2])
-            QDCOUNT = int.from_bytes(buf[4:6])
-            Q_HEADER = buf[0:12]
+
+            '''
 
             # Flags
             FLAGS = int.from_bytes(buf[2:4])  # Read the original FLAGS field
@@ -205,33 +205,63 @@ def main():
                 RCODE = 0
             else:
                 RCODE = 4  # Not implemented
+            '''
+
+            # Others
+            QDCOUNT = int.from_bytes(buf[4:6])
+            ANCOUNT = int.from_bytes(buf[6:8])
+            NSCOUNT = int.from_bytes(buf[8:10])
+            ARCOUNT = int.from_bytes(buf[10:12])
+
+            
 
             domains = list_of_domains(buf, QDCOUNT)
 
-            questions, answers = bytearray(), bytearray()
+            print("domains: ", domains)
+            
+            dnsmainmsg = DNSMessage()
 
-            adnsobject = DNSPacket()
-            adnsobject.set_header(ID=ID, QR=1, QDCOUNT=QDCOUNT, ANCOUNT=QDCOUNT, RD=RD, OPCODE=OPCODE, RCODE=RCODE)
-            A_HEADER = adnsobject.get_header()
+            dnsmainmsg.set_header(ID=ID, QR=0, QDCOUNT=QDCOUNT)
+
+            header = dnsmainmsg.get_header()
+            questions = bytearray()
+            #answers = bytearray()
+
 
             for domain in domains:
-                offset = 12
-                qdnsobject = DNSPacket()
-                qdnsobject.set_question(QNAME=domain, QTYPE=1, QCLASS=1)
-                qdnsobject.set_header(ID=ID, QDCOUNT=1)
-                header = qdnsobject.get_header()
-                question = qdnsobject.get_question()
-                questions.extend(question)
-                offset += len(question)
-                querypacket = header + question
-                forwarder_socket.sendto(querypacket, ("127.0.0.1", 5354))
-                answer, resolver = forwarder_socket.recvfrom(512)
-                answer = answer[offset:]
-                answers.extend(answer)
-               
-                
-            response_packet = A_HEADER + questions + answers
-            udp_socket.sendto(response_packet, source)
+                dnsmsg = DNSMessage()
+                dnsmsg.set_question(QNAME=domain, QTYPE=1, QCLASS=1)
+                questions.extend(dnsmsg.get_question())
+
+            
+            while questions:
+                question = questions.pop()
+            
+            '''
+            
+            for domain in domains:
+                dnsmsg = DNSMessage()
+                dnsmsg.set_answer(NAME=domain, TYPE=1, CLASS=1, TTL=60, LENGTH=4, RDATA="8.8.8.8")
+                answers.extend(dnsmsg.get_answer())
+            '''
+        
+            response = buf[0:12] + questions
+            response_size = len(response)
+
+            if response_size > 512:
+                print(f"ERROR: Response too big! {response_size} bytes")
+                response = response[:512]  # Truncate to fit UDP limits
+            
+            forwarder_socket.sendto(response, ("127.0.0.1", 5354))
+
+            # Receive the response from the forwarded server
+            ans, server_address = forwarder_socket.recvfrom(512)
+
+            dns_resolution = DNSMessage()
+            dns_resolution.set_header(ID=ID, QR=1, QDCOUNT=1, ANCOUNT=1)
+            ansheader = dns_resolution.get_header()
+            sendback = ansheader + questions + ans
+            udp_socket.sendto(sendback, source)
         except Exception as e:
             print(f"Error receiving data: {e}")
             break
