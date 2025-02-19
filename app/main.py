@@ -1,9 +1,9 @@
 import socket
 
 class DNSPacket:
-    def __init__(self, 
-                 header=None, 
-                 question=None, 
+    def __init__(self,
+                 header=None,
+                 question=None,
                  answer=None,
                  authority=None,
                  space=None
@@ -13,7 +13,7 @@ class DNSPacket:
         self.answer = answer if answer is not None else bytearray()
         self.authority = authority
         self.space = space
-    
+
     def set_header(self,
                    ID=0,
                    QR=0,
@@ -32,7 +32,7 @@ class DNSPacket:
         '''
         A lot of byte setting here. Understand >> and << as bit shifts: x >> 8 will basically move x's bits 8 times to the right
         which will essentially flush the final 8 bits. When we do a logical AND of this value with all 1s, i.e., (x >> 8) & 0xFF,
-        we end up extracting those particular bits and pad them into a byte. 
+        we end up extracting those particular bits and pad them into a byte.
         '''
         # set PID
         self.header[0] = (ID >> 8) & 0xFF
@@ -60,15 +60,15 @@ class DNSPacket:
         #set ARCOUNT
         self.header[10] =(ARCOUNT >> 8) & 0xFF
         self.header[11] = ARCOUNT & 0xFF
-    
+
     def get_header(self):
         return self.header
-    
+
     def set_question(self,
                      QNAME="",
                      QTYPE=0,
                      QCLASS=0):
-        
+
         # Set question name
         QNAME = QNAME.split('.')
         for token in QNAME:
@@ -83,7 +83,7 @@ class DNSPacket:
         # Set QCLASS
         self.question.append((QCLASS >> 8) & 0xFF)
         self.question.append(QCLASS & 0xFF)
-    
+
     def get_question(self):
         return self.question
 
@@ -94,7 +94,7 @@ class DNSPacket:
                    TTL=0, # 4 byte
                    LENGTH=0, # 2 byte
                    RDATA=""): # variable
-        
+
         NAME = NAME.split('.')
         for token in NAME:
             self.answer.append(len(token))
@@ -135,7 +135,7 @@ class DNSPacket:
 
         # 6. Write the RDATA bytes
         self.answer.extend(rdata_bytes)
-    
+
     def get_answer(self):
         return self.answer
 
@@ -176,31 +176,29 @@ def list_of_domains(packet, qdcount):
         domain_names.append(".".join(domain_name))
         # Skip QTYPE (2 bytes) and QCLASS (2 bytes)
         j += 4
-        
+
     return domain_names
 
 def main():
     # You can use `print` statements as follows for debugging, they'll be visible when running tests.
     print("Logs from your program will appear here!")
-    
+
     udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     forwarder_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     udp_socket.bind(("127.0.0.1", 2053))
-    
+
     while True:
         try:
             buf, source = udp_socket.recvfrom(512)
-            
+
             ID = int.from_bytes(buf[0:2])
             QDCOUNT = int.from_bytes(buf[4:6])
-            Q_HEADER = buf[0:12]
 
             # Flags
             FLAGS = int.from_bytes(buf[2:4])  # Read the original FLAGS field
-            QR = (FLAGS >> 15) & 0b1
             OPCODE = (FLAGS >> 11) & 0b1111
             RD = (FLAGS >> 8) & 0b1  # Extract the RD bit
-            
+
             if OPCODE == 0:
                 RCODE = 0
             else:
@@ -228,8 +226,8 @@ def main():
                 answer, resolver = forwarder_socket.recvfrom(512)
                 answer = answer[offset:]
                 answers.extend(answer)
-               
-                
+
+
             response_packet = A_HEADER + questions + answers
             udp_socket.sendto(response_packet, source)
         except Exception as e:
