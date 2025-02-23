@@ -48,10 +48,8 @@ class DNSPacket:
         self.header[5] = QDCOUNT & 0xFF
 
         #set ANCOUNT
-        high_byte = (ANCOUNT >> 8) & 0xFF
-        low_byte = ANCOUNT & 0xFF
-        self.header[6] = high_byte
-        self.header[7] = low_byte
+        self.header[6] = (ANCOUNT >> 8) & 0xFF
+        self.header[7] = ANCOUNT & 0xFF
 
         #set NSCOUNT
         self.header[8] = (NSCOUNT >> 8) & 0xFF
